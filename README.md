@@ -33,7 +33,7 @@ Real-time **bidirectional** English ↔ Chinese voice translation overlay for Wi
 ### 2. Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/voice-translation-tool.git
+git clone https://github.com/Rainforest0204/voice-translation-tool.git
 cd voice-translation-tool
 python -m venv .venv
 .venv\Scripts\activate
