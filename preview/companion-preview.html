@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>语音翻译伴侣 — 预览</title>
+<style>
+  :root {
+    --bg-glass:       rgba(255,255,255,0.72);
+    --bg-glass-dark:  rgba(30,31,43,0.80);
+    --bg-card:        rgba(255,255,255,0.90);
+    --bg-panel:       rgba(255,255,255,0.88);
+    --text-primary:   #1A1B2E;
+    --text-secondary: #5A5C72;
+    --text-tertiary:  #9496A8;
+    --text-on-dark:   #E8E9F0;
+    --accent:         #4F6EF7;
+    --accent-hover:   #3D56D4;
+    --success:        #34C759;
+    --warning:        #FF9500;
+    --danger:         #FF3B30;
+    --accent-subtle:  rgba(79,110,247,0.08);
+    --border:         rgba(0,0,0,0.06);
+    --border-glass:   rgba(0,0,0,0.07);
+    --shadow-sm:  0 2px 8px  rgba(0,0,0,0.05);
+    --shadow-md:  0 8px 24px rgba(0,0,0,0.09);
+    --shadow-lg:  0 16px 48px rgba(0,0,0,0.13);
+    --shadow-xl:  0 24px 64px rgba(0,0,0,0.18);
+    --radius-sm: 5px; --radius-md: 9px; --radius-lg: 14px; --radius-full: 50%;
+    --font-sans: 'Inter','PingFang SC','Microsoft YaHei',sans-serif;
+    --font-mono: 'JetBrains Mono','Cascadia Code','Consolas',monospace;
+    --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+    --transition-spring: 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html, body {
+    background: transparent;
+    font-family:var(--font-sans);color:var(--text-primary);
+    height:100vh;overflow:hidden;user-select:none;
+    display:flex;justify-content:center;align-items:center;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ===== 点阵背景（极淡，体现浮层感） ===== */
+  body::after {
+    content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background-image:radial-gradient(rgba(0,0,0,0.04) 1px,transparent 1px);
+    background-size:24px 24px;
+  }
+
+  .container{
+    position:relative;z-index:10;
+    display:flex;flex-direction:column;align-items:center;gap:10px;
+  }
+
+  /* ===== 伴侣区域 ===== */
+  .companion-wrapper{position:relative;width:155px;height:155px}
+
+  #particleCanvas{
+    position:absolute;top:-28px;left:-28px;
+    width:210px;height:210px;pointer-events:none;z-index:0;
+    opacity:0;transition:opacity 0.4s;
+  }
+  #particleCanvas.active{opacity:1}
+
+  /* ===== 伴侣本体 ===== */
+  .companion{
+    position:absolute;top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    width:76px;height:76px;border-radius:50%;z-index:2;
+    cursor:grab;transition:width 0.3s,height 0.3s,box-shadow 0.3s;
+  }
+  .companion:active{cursor:grabbing}
+
+  .glass-outer{
+    position:absolute;inset:-10px;border-radius:50%;
+    background:var(--bg-glass);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--border-glass);
+    box-shadow:var(--shadow-md);transition:all 0.3s;
+  }
+
+  .status-ring{
+    position:absolute;inset:-4px;border-radius:50%;
+    border:2px solid transparent;transition:all 0.5s;pointer-events:none;
+  }
+
+  .inner-circle{
+    position:absolute;inset:2px;border-radius:50%;
+    background:var(--bg-glass);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(0,0,0,0.04);transition:all 0.3s;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  .core{
+    width:21px;height:21px;border-radius:50%;
+    background:var(--accent);transition:all 0.4s;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .core-dot{
+    width:5px;height:5px;border-radius:50%;background:white;transition:all 0.4s;
+  }
+
+  .pupil-ring{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:29px;height:29px;border-radius:50%;
+    border:1.5px solid rgba(79,110,247,0.14);pointer-events:none;transition:all 0.35s;
+  }
+
+  .wake-badge{
+    position:absolute;top:-3px;right:-3px;
+    width:11px;height:11px;border-radius:50%;
+    background:var(--warning);border:2px solid rgba(255,255,255,0.9);
+    box-shadow:var(--shadow-sm);z-index:5;
+    opacity:0;transform:scale(0);
+    transition:all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .wake-badge.active{opacity:1;transform:scale(1)}
+
+  /* ===== 模式标签 ===== */
+  .mode-badge{
+    position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+    background:var(--bg-card);border:1px solid var(--border);
+    border-radius:var(--radius-sm);padding:2px 8px;
+    font-size:8.5px;font-weight:700;font-family:var(--font-mono);
+    color:var(--text-secondary);white-space:nowrap;
+    box-shadow:var(--shadow-sm);z-index:6;letter-spacing:0.4px;transition:all 0.3s;
+  }
+
+  /* ===== 字幕预览 ===== */
+  .subtitle-preview{
+    background:var(--bg-glass-dark);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:var(--radius-md);padding:7px 14px;
+    max-width:340px;min-width:180px;
+    box-shadow:var(--shadow-md);text-align:center;transition:all 0.3s;
+  }
+  .subtitle-preview .source-text{
+    font-size:9px;color:rgba(255,255,255,0.42);
+    font-family:var(--font-sans);line-height:1.3;
+    min-height:12px;overflow:hidden;margin-bottom:1px;
+  }
+  .subtitle-preview .target-text{
+    font-size:13px;color:white;font-weight:600;
+    font-family:var(--font-sans);line-height:1.4;
+    min-height:18px;overflow:hidden;transition:all 0.25s;
+  }
+  .subtitle-preview.empty .target-text{
+    color:rgba(255,255,255,0.20);font-weight:400;font-style:italic;
+  }
+
+  /* ===== 延迟指示器 ===== */
+  .latency-indicator{
+    display:flex;align-items:center;gap:5px;
+    font-family:var(--font-mono);font-size:9px;color:var(--text-tertiary);
+    background:var(--bg-glass);border-radius:var(--radius-sm);
+    padding:3px 8px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    border:1px solid var(--border-glass);
+  }
+  .latency-dot{width:5px;height:5px;border-radius:50%;background:var(--success)}
+  .latency-dot.slow{background:var(--warning)}
+
+  /* ===== 环形菜单 ===== */
+  .radial-menu{
+    position:absolute;top:50%;left:50%;
+    transform:translate(-50%,-50%) scale(0.6);
+    width:205px;height:205px;border-radius:50%;
+    z-index:10;pointer-events:none;opacity:0;
+    transition:opacity 0.2s,transform var(--transition-spring);
+  }
+  .radial-menu.open{
+    opacity:1;pointer-events:auto;
+    transform:translate(-50%,-50%) scale(1);
+  }
+  .radial-backdrop{
+    position:absolute;inset:6px;border-radius:50%;
+    background:var(--bg-card);box-shadow:var(--shadow-lg);
+    border:1px solid var(--border-glass);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  }
+  .radial-item{
+    position:absolute;width:43px;height:43px;border-radius:50%;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    cursor:pointer;transition:all 0.18s;
+    background:rgba(255,255,255,0.82);
+    border:1px solid rgba(0,0,0,0.05);
+    box-shadow:0 1px 3px rgba(0,0,0,0.04);pointer-events:auto;
+  }
+  .radial-item:hover{
+    background:var(--accent-subtle);border-color:var(--accent);
+    box-shadow:0 2px 8px rgba(0,0,0,0.08);transform:scale(1.13);
+  }
+  .radial-item:active{transform:scale(0.92)}
+  .radial-item .icon{font-size:14px;line-height:1}
+  .radial-item .label{font-size:5.8px;font-family:var(--font-mono);font-weight:700;
+    color:var(--text-tertiary);margin-top:1px;letter-spacing:0.2px;transition:color 0.18s}
+  .radial-item:hover .label{color:var(--accent)}
+
+  /* 5项环形排列 */
+  .ri-0{top:6px;left:81px}
+  .ri-1{top:38px;left:148px}
+  .ri-2{top:38px;left:14px}
+  .ri-3{top:98px;left:81px}
+  .ri-4{top:68px;left:81px}
+
+  /* ===== 设备面板 ===== */
+  .device-panel{
+    position:absolute;top:50%;left:50%;
+    transform:translate(-50%,-50%) scale(0.8);
+    width:240px;
+    background:var(--bg-panel);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid var(--border-glass);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-xl);
+    padding:14px 16px;
+    z-index:15;pointer-events:none;opacity:0;
+    transition:opacity 0.2s,transform var(--transition-spring);
+    display:flex;flex-direction:column;gap:10px;
+  }
+  .device-panel.open{
+    opacity:1;pointer-events:auto;
+    transform:translate(-50%,-50%) scale(1);
+  }
+
+  .device-panel .panel-title{
+    font-family:var(--font-sans);font-size:11px;font-weight:700;
+    color:var(--text-primary);letter-spacing:0.3px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .device-panel .panel-close{
+    width:22px;height:22px;border-radius:50%;border:none;
+    background:rgba(0,0,0,0.04);cursor:pointer;
+    font-size:12px;color:var(--text-tertiary);display:flex;
+    align-items:center;justify-content:center;transition:all 0.15s;
+  }
+  .device-panel .panel-close:hover{background:rgba(255,59,48,0.12);color:var(--danger)}
+
+  .device-field{display:flex;flex-direction:column;gap:4px}
+  .device-field label{
+    font-family:var(--font-mono);font-size:8px;font-weight:700;
+    color:var(--text-tertiary);letter-spacing:0.5px;text-transform:uppercase;
+  }
+  .device-field select{
+    width:100%;padding:7px 10px;
+    background:rgba(0,0,0,0.02);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    font-family:var(--font-sans);font-size:11px;font-weight:500;
+    color:var(--text-primary);cursor:pointer;
+    transition:all 0.15s;appearance:none;
+    -webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239496A8'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 10px center;
+    padding-right:28px;
+  }
+  .device-field select:hover{border-color:var(--accent)}
+  .device-field select:focus{
+    outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 2px rgba(79,110,247,0.10);
+  }
+  .device-field .device-hint{
+    font-size:8px;color:var(--text-tertiary);font-family:var(--font-sans);
+    margin-top:-1px;
+  }
+  .device-field select option{font-family:var(--font-mono);font-size:10px}
+
+  .device-refresh{
+    align-self:flex-end;
+    padding:5px 12px;border:1px solid var(--border);
+    border-radius:var(--radius-sm);background:rgba(0,0,0,0.02);
+    font-family:var(--font-mono);font-size:9px;font-weight:600;
+    color:var(--text-secondary);cursor:pointer;letter-spacing:0.3px;
+    transition:all 0.15s;
+  }
+  .device-refresh:hover{background:var(--accent-subtle);border-color:var(--accent);color:var(--accent)}
+
+  /* ===== 上下文菜单 ===== */
+  .context-menu{
+    position:fixed;background:var(--bg-card);
+    border:1px solid rgba(0,0,0,0.07);border-radius:var(--radius-md);
+    box-shadow:var(--shadow-lg);padding:4px 0;min-width:155px;z-index:100;
+    display:none;
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  }
+  .context-menu.show{display:block}
+  .context-menu .ctx-item{
+    padding:7px 14px;cursor:pointer;font-size:11px;font-weight:500;
+    color:var(--text-primary);transition:all 0.1s;
+    display:flex;align-items:center;gap:8px;
+  }
+  .context-menu .ctx-item:hover{background:var(--accent-subtle);color:var(--accent)}
+  .context-menu .ctx-item .dot{width:5px;height:5px;border-radius:50%}
+  .context-menu .ctx-sep{height:1px;background:rgba(0,0,0,0.06);margin:4px 0}
+
+  /* ===== 模式切换组 ===== */
+  .mode-toggle-group{
+    display:flex;gap:0;
+    background:var(--bg-glass);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    border:1px solid var(--border-glass);border-radius:var(--radius-md);
+    overflow:hidden;box-shadow:var(--shadow-sm);
+  }
+  .mode-btn{
+    padding:6px 13px;border:none;background:transparent;
+    color:var(--text-secondary);cursor:pointer;
+    font-family:var(--font-sans);font-size:10px;font-weight:600;
+    letter-spacing:0.3px;transition:all 0.2s;
+    display:flex;align-items:center;gap:4px;
+  }
+  .mode-btn:first-child{border-right:1px solid rgba(0,0,0,0.05)}
+  .mode-btn:hover{color:var(--text-primary);background:rgba(0,0,0,0.02)}
+  .mode-btn.active{background:var(--accent);color:white}
+
+  /* ===== 状态行 ===== */
+  .status-row{
+    display:flex;align-items:center;gap:7px;
+    font-size:8.5px;font-family:var(--font-mono);color:var(--text-tertiary);
+    background:var(--bg-glass);border-radius:var(--radius-sm);
+    padding:3px 8px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    border:1px solid var(--border-glass);
+  }
+  .status-row .pipe{width:1px;height:9px;background:rgba(0,0,0,0.08)}
+
+  /* ===== Toast ===== */
+  .toast{
+    position:fixed;bottom:36px;left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--bg-glass-dark);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    color:var(--text-on-dark);border:1px solid rgba(255,255,255,0.08);
+    border-radius:var(--radius-md);padding:7px 16px;
+    font-size:11px;font-weight:500;opacity:0;
+    transition:all 0.25s;z-index:200;pointer-events:none;
+    box-shadow:var(--shadow-md);
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ===== 快捷提示 ===== */
+  .info-panel{
+    position:fixed;bottom:12px;right:12px;
+    background:var(--bg-glass);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--border-glass);border-radius:var(--radius-md);
+    box-shadow:var(--shadow-sm);padding:9px 12px;
+    font-size:8.5px;font-family:var(--font-mono);
+    color:var(--text-tertiary);line-height:1.7;z-index:10;
+  }
+  .info-panel strong{color:var(--text-primary)}
+  .info-panel kbd{display:inline-block;background:rgba(0,0,0,0.03);
+    border:1px solid rgba(0,0,0,0.07);border-radius:3px;
+    padding:0 4px;font-size:8px;color:var(--text-secondary)}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- ===== 伴侣 ===== -->
+  <div class="companion-wrapper" id="companionArea">
+    <canvas id="particleCanvas"></canvas>
+
+    <!-- 环形菜单 -->
+    <div class="radial-menu" id="radialMenu">
+      <div class="radial-backdrop"></div>
+      <div class="radial-item ri-0" data-action="toggle_capture"><span class="icon">⏯</span><span class="label">暂停</span></div>
+      <div class="radial-item ri-1" data-action="clear"><span class="icon">✖</span><span class="label">清除</span></div>
+      <div class="radial-item ri-2" data-action="devices"><span class="icon">🎧</span><span class="label">设备</span></div>
+      <div class="radial-item ri-3" data-action="mode_switch"><span class="icon">⇄</span><span class="label">切换</span></div>
+      <div class="radial-item ri-4" data-action="settings"><span class="icon">⚙</span><span class="label">设置</span></div>
+    </div>
+
+    <!-- 设备选择面板 -->
+    <div class="device-panel" id="devicePanel">
+      <div class="panel-title">
+        音频设备
+        <button class="panel-close" id="devicePanelClose">✕</button>
+      </div>
+      <div class="device-field">
+        <label>🔊 输出设备（扬声器捕获源）</label>
+        <select id="outputDevice">
+          <option value="wasapi:0">扬声器 (Realtek Audio)  [默认]</option>
+          <option value="wasapi:1">耳机 (HyperX Cloud II)</option>
+          <option value="wasapi:2">SteelSeries Sonar — Game</option>
+          <option value="wasapi:3">SteelSeries Sonar — Chat</option>
+          <option value="wasapi:4">显示器 (DP — NVIDIA)</option>
+          <option value="wasapi:5">Virtual Audio Cable</option>
+          <option value="steromix:0">Stereo Mix (Realtek Audio)</option>
+        </select>
+        <span class="device-hint">回环模式：捕获系统播放的音频</span>
+      </div>
+      <div class="device-field">
+        <label>🎤 输入设备（麦克风）</label>
+        <select id="inputDevice">
+          <option value="sounddevice:0">麦克风阵列 (Realtek)  [默认]</option>
+          <option value="sounddevice:1">HyperX Cloud II — 麦克风</option>
+          <option value="sounddevice:2">Blue Yeti — USB 麦克风</option>
+          <option value="sounddevice:3">SteelSeries Sonar — 麦克风</option>
+          <option value="sounddevice:4">Elgato Wave:3</option>
+          <option value="sounddevice:5">CABLE Output (VB-Audio)</option>
+        </select>
+        <span class="device-hint">麦克风模式：捕获你的语音</span>
+      </div>
+      <button class="device-refresh" id="deviceRefresh">⟳ 刷新设备列表</button>
+    </div>
+
+    <!-- 伴侣本体 -->
+    <div class="companion" id="companion">
+      <div class="glass-outer"></div>
+      <div class="status-ring" id="statusRing"></div>
+      <div class="inner-circle">
+        <div class="pupil-ring" id="pupilRing"></div>
+        <div class="core" id="core"><div class="core-dot"></div></div>
+      </div>
+      <div class="wake-badge" id="wakeBadge"></div>
+    </div>
+    <div class="mode-badge" id="modeBadge">🔊 EN→ZH</div>
+  </div>
+
+  <!-- 字幕预览 -->
+  <div class="subtitle-preview empty" id="subtitlePreview">
+    <div class="source-text" id="sourceText">等待语音输入…</div>
+    <div class="target-text" id="targetText">字幕将显示在这里</div>
+  </div>
+
+  <!-- 延迟 -->
+  <div class="latency-indicator">
+    <span class="latency-dot" id="latencyDot"></span>
+    <span id="latencyLabel">延迟: --ms</span>
+  </div>
+
+  <!-- 状态行 -->
+  <div class="status-row">
+    <span id="statusLabel">◉ 待机</span>
+    <span class="pipe"></span>
+    <span id="capturedLabel">CAPTURED: 0</span>
+    <span class="pipe"></span>
+    <span id="translatedLabel">TRANS: 0</span>
+    <span class="pipe"></span>
+    <span id="deviceLabel" title="当前设备">🔊 扬声器</span>
+  </div>
+
+  <!-- 模式切换 -->
+  <div class="mode-toggle-group">
+    <button class="mode-btn active" data-mode="loopback">🔊 扬声器捕获 EN→ZH</button>
+    <button class="mode-btn" data-mode="microphone">🎤 麦克风捕获 ZH→EN</button>
+  </div>
+</div>
+
+<!-- 上下文菜单 -->
+<div class="context-menu" id="contextMenu">
+  <div class="ctx-item" data-action="toggle_capture"><span class="dot" style="background:var(--success)"></span>暂停 / 恢复</div>
+  <div class="ctx-item" data-action="clear"><span class="dot" style="background:var(--danger)"></span>清除字幕</div>
+  <div class="ctx-item" data-action="devices"><span class="dot" style="background:var(--accent)"></span>音频设备…</div>
+  <div class="ctx-item" data-action="mode_switch"><span class="dot" style="background:var(--warning)"></span>切换采集模式</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" data-action="settings"><span class="dot" style="background:var(--text-tertiary)"></span>打开设置…</div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- 快捷提示 -->
+<div class="info-panel">
+  <strong>语音翻译伴侣</strong><br>
+  单击 = 环形菜单<br>
+  双击 = 切换字幕显隐<br>
+  右键 = 上下文菜单<br>
+  拖拽 = 移动位置<br><br>
+  <strong>功能</strong><br>
+  <kbd>Ctrl</kbd>+<kbd>S</kbd> 模拟翻译<br>
+  <kbd>Ctrl</kbd>+<kbd>V</kbd> 模拟语音指令<br>
+  <kbd>Ctrl</kbd>+<kbd>M</kbd> 切换模式<br>
+  <kbd>Ctrl</kbd>+<kbd>D</kbd> 打开设备面板
+</div>
+
+<script>
+// ============================================================
+// 应用状态
+// ============================================================
+let currentMode = 'loopback';
+let pipelineState = 'IDLE';
+let isPaused = false;
+let capturedCount = 0;
+let translatedCount = 0;
+let radialOpen = false;
+let devicePanelOpen = false;
+let isDragging = false;
+let wakeActive = false;
+
+// 设备状态
+let outputDevice = 'wasapi:0';
+let inputDevice = 'sounddevice:0';
+let outputDeviceName = '扬声器 (Realtek Audio)';
+let inputDeviceName = '麦克风阵列 (Realtek)';
+
+// ============================================================
+// DOM refs
+// ============================================================
+const companion = document.getElementById('companion');
+const companionArea = document.getElementById('companionArea');
+const core = document.getElementById('core');
+const coreDot = core.querySelector('.core-dot');
+const statusRing = document.getElementById('statusRing');
+const pupilRing = document.getElementById('pupilRing');
+const glassOuter = companion.querySelector('.glass-outer');
+const modeBadge = document.getElementById('modeBadge');
+const subtitlePreview = document.getElementById('subtitlePreview');
+const sourceText = document.getElementById('sourceText');
+const targetText = document.getElementById('targetText');
+const latencyDot = document.getElementById('latencyDot');
+const latencyLabel = document.getElementById('latencyLabel');
+const statusLabel = document.getElementById('statusLabel');
+const capturedLabel = document.getElementById('capturedLabel');
+const translatedLabel = document.getElementById('translatedLabel');
+const deviceLabel = document.getElementById('deviceLabel');
+const radialMenu = document.getElementById('radialMenu');
+const devicePanel = document.getElementById('devicePanel');
+const contextMenu = document.getElementById('contextMenu');
+const toast = document.getElementById('toast');
+const wakeBadge = document.getElementById('wakeBadge');
+const particleCanvas = document.getElementById('particleCanvas');
+const outputSelect = document.getElementById('outputDevice');
+const inputSelect = document.getElementById('inputDevice');
+const ctx = particleCanvas.getContext('2d');
+particleCanvas.width = 210;
+particleCanvas.height = 210;
+
+// ============================================================
+// 设备选择
+// ============================================================
+outputSelect.addEventListener('change', function() {
+  outputDevice = this.value;
+  outputDeviceName = this.options[this.selectedIndex].text.replace('  [默认]','');
+  updateDeviceLabel();
+  showToast('🔊 输出: ' + outputDeviceName);
+});
+
+inputSelect.addEventListener('change', function() {
+  inputDevice = this.value;
+  inputDeviceName = this.options[this.selectedIndex].text.replace('  [默认]','');
+  updateDeviceLabel();
+  showToast('🎤 输入: ' + inputDeviceName);
+});
+
+document.getElementById('deviceRefresh').addEventListener('click', function() {
+  this.textContent = '⟳ 刷新中…';
+  this.style.color = 'var(--accent)';
+  setTimeout(() => {
+    this.textContent = '⟳ 刷新设备列表';
+    this.style.color = '';
+    showToast('设备列表已刷新');
+  }, 800);
+});
+
+function updateDeviceLabel() {
+  const name = currentMode === 'loopback' ? outputDeviceName : inputDeviceName;
+  const icon = currentMode === 'loopback' ? '🔊' : '🎤';
+  deviceLabel.textContent = icon + ' ' + (name.length > 14 ? name.slice(0,14)+'…' : name);
+  deviceLabel.title = currentMode === 'loopback' ? '输出: ' + outputDeviceName : '输入: ' + inputDeviceName;
+}
+
+function openDevicePanel() {
+  devicePanelOpen = true;
+  devicePanel.classList.add('open');
+  closeRadial();
+}
+
+function closeDevicePanel() {
+  devicePanelOpen = false;
+  devicePanel.classList.remove('open');
+}
+
+document.getElementById('devicePanelClose').addEventListener('click', closeDevicePanel);
+
+// ============================================================
+// 模式切换
+// ============================================================
+function setMode(mode) {
+  currentMode = mode;
+  const isLoopback = mode === 'loopback';
+  modeBadge.textContent = isLoopback ? '🔊 EN→ZH' : '🎤 ZH→EN';
+  updateDeviceLabel();
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  sourceText.textContent = isLoopback ? '正在从 ' + outputDeviceName + ' 捕获音频…' : '正在从 ' + inputDeviceName + ' 收听从…';
+  targetText.textContent = isLoopback ? '等待英文语音…' : '等待中文语音…';
+  subtitlePreview.classList.add('empty');
+  showToast(isLoopback ? '🔊 扬声器捕获 → EN→ZH 翻译' : '🎤 麦克风捕获 → ZH→EN 翻译');
+}
+
+// ============================================================
+// 管道状态
+// ============================================================
+const STATE_CFG = {
+  IDLE:       { color:'#4F6EF7', ring:'rgba(79,110,247,0.07)',  dot:'#34C759', label:'◉ 待机',   shadow:'0 8px 24px rgba(0,0,0,0.07)' },
+  LISTENING:  { color:'#4F6EF7', ring:'rgba(79,110,247,0.22)',  dot:'#34C759', label:'◉ 倾听中', shadow:'0 8px 28px rgba(79,110,247,0.10)' },
+  TRANSLATING:{ color:'#34C759', ring:'rgba(52,199,89,0.28)',   dot:'#FF9500', label:'◉ 翻译中', shadow:'0 8px 28px rgba(52,199,89,0.10)' },
+  INTENSE:    { color:'#FF3B30', ring:'rgba(255,59,48,0.32)',   dot:'#FF9500', label:'◉ 高强度', shadow:'0 8px 32px rgba(255,59,48,0.11)' },
+  SLEEP:      { color:'#9496A8', ring:'rgba(148,150,168,0.08)', dot:'#C8CAD4', label:'◉ 已暂停', shadow:'0 4px 12px rgba(0,0,0,0.04)' },
+};
+
+function setPipelineState(state) {
+  pipelineState = state;
+  const cfg = STATE_CFG[state];
+  core.style.background = cfg.color;
+  statusRing.style.borderColor = cfg.ring;
+  glassOuter.style.boxShadow = cfg.shadow;
+  statusLabel.textContent = cfg.label;
+  latencyDot.style.background = cfg.dot;
+
+  switch(state) {
+    case 'LISTENING':
+      coreDot.style.width = '7px'; coreDot.style.height = '7px';
+      pupilRing.style.width = '37px'; pupilRing.style.height = '37px';
+      pupilRing.style.borderColor = 'rgba(79,110,247,0.20)';
+      break;
+    case 'TRANSLATING':
+      coreDot.style.width = '6px'; coreDot.style.height = '6px';
+      pupilRing.style.width = '42px'; pupilRing.style.height = '42px';
+      pupilRing.style.borderColor = 'rgba(52,199,89,0.20)';
+      break;
+    case 'INTENSE':
+      coreDot.style.width = '3px'; coreDot.style.height = '3px';
+      pupilRing.style.width = '25px'; pupilRing.style.height = '25px';
+      pupilRing.style.borderColor = 'rgba(255,59,48,0.26)';
+      break;
+    case 'SLEEP':
+      coreDot.style.width = '4px'; coreDot.style.height = '4px';
+      pupilRing.style.width = '27px'; pupilRing.style.height = '27px';
+      pupilRing.style.borderColor = 'rgba(148,150,168,0.06)';
+      break;
+    default:
+      coreDot.style.width = '5px'; coreDot.style.height = '5px';
+      pupilRing.style.width = '29px'; pupilRing.style.height = '29px';
+      pupilRing.style.borderColor = 'rgba(79,110,247,0.14)';
+  }
+
+  const hasParticles = ['LISTENING','TRANSLATING','INTENSE'].includes(state);
+  particleCanvas.classList.toggle('active', hasParticles);
+  if (state === 'INTENSE') {
+    for (let i = 0; i < 18; i++) particles.push(spawnParticle());
+  }
+}
+
+// ============================================================
+// 模拟翻译
+// ============================================================
+const SIM_DATA = {
+  loopback: [
+    { source:'Welcome back to another tutorial about machine learning', target:'欢迎回来，今天我们来探索机器学习的基础知识', latency:310 },
+    { source:'Today we are going to build a complete application from scratch', target:'今天我们将从零开始构建一个完整的应用程序', latency:295 },
+    { source:'Make sure you have Python installed before we begin', target:'在开始之前请确保你已经安装了Python', latency:340 },
+  ],
+  microphone: [
+    { source:'大家好今天我想和大家分享一下机器学习的基础概念', target:"Hello everyone, today I'd like to share the fundamentals of machine learning", latency:275 },
+    { source:'首先我们要理解什么是神经网络的训练过程', target:'First we need to understand what the neural network training process is', latency:310 },
+    { source:'这个项目我已经做了三个月了效果还不错', target:"I've been working on this project for three months and the results are pretty good", latency:290 },
+  ],
+};
+let simIndex = 0;
+
+function simulateTranslation() {
+  if (isPaused) return;
+
+  setPipelineState('LISTENING');
+  capturedCount++;
+  capturedLabel.textContent = 'CAPTURED: ' + capturedCount;
+
+  setTimeout(() => setPipelineState('TRANSLATING'), 500);
+
+  setTimeout(() => {
+    const pool = SIM_DATA[currentMode];
+    const data = pool[simIndex % pool.length];
+    simIndex++;
+    translatedCount++;
+    translatedLabel.textContent = 'TRANS: ' + translatedCount;
+    latencyLabel.textContent = '延迟: ' + data.latency + 'ms';
+
+    sourceText.textContent = data.source;
+    targetText.textContent = data.target;
+    subtitlePreview.classList.remove('empty');
+
+    setTimeout(() => setPipelineState('IDLE'), 400);
+  }, 1000 + Math.random() * 500);
+}
+
+// ============================================================
+// 动画循环
+// ============================================================
+let animStart = performance.now();
+function animate(timestamp) {
+  const t = (timestamp - animStart) / 1000;
+  switch(pipelineState) {
+    case 'IDLE': {
+      const b = Math.sin(t * 1.2) * 0.025;
+      companion.style.transform = 'translate(-50%,-50%) scale(' + (1+b) + ')';
+      break;
+    }
+    case 'LISTENING': {
+      const p = Math.abs(Math.sin(t * 2.8));
+      companion.style.transform = 'translate(-50%,-50%) scale(' + (1+p*0.035) + ')';
+      statusRing.style.borderColor = 'rgba(79,110,247,' + (0.13 + p*0.16) + ')';
+      break;
+    }
+    case 'TRANSLATING': {
+      const r = Math.sin(t*2.2)*0.5 + Math.sin(t*4.7)*0.3;
+      companion.style.transform = 'translate(-50%,-50%) scale(' + (1+r*0.028) + ')';
+      const angle = t * 2.2;
+      coreDot.style.transform = 'translate(' + (Math.cos(angle)*2.3) + 'px,' + (Math.sin(angle)*2.3) + 'px)';
+      break;
+    }
+    case 'INTENSE': {
+      const f = Math.abs(Math.sin(t * 10));
+      glassOuter.style.boxShadow = '0 8px 32px rgba(255,59,48,' + (0.07+f*0.10) + ')';
+      break;
+    }
+    case 'SLEEP': {
+      const b = Math.sin(t * 0.5) * 0.010;
+      companion.style.transform = 'translate(-50%,-50%) scale(' + (1+b) + ')';
+      break;
+    }
+  }
+  if (pipelineState !== 'TRANSLATING') {
+    coreDot.style.transform = 'translate(0,0)';
+  }
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
+// ============================================================
+// 粒子系统
+// ============================================================
+let particles = [];
+let lastSpawn = 0;
+
+function spawnParticle() {
+  const cx = 105, cy = 105;
+  const a = Math.random() * Math.PI * 2;
+  const d = 37 + Math.random() * 11;
+  return {
+    x: cx + Math.cos(a)*d, y: cy + Math.sin(a)*d,
+    vx: Math.cos(a)*0.35, vy: Math.sin(a)*0.35,
+    life: 0.75, maxLife: 0.75, size: 1.1 + Math.random()*1.6,
+  };
+}
+
+function particleLoop(ts) {
+  const active = ['LISTENING','TRANSLATING','INTENSE'].includes(pipelineState);
+  const maxP = pipelineState === 'TRANSLATING' ? 20 : pipelineState === 'INTENSE' ? 32 : 6;
+  const spawnRate = pipelineState === 'TRANSLATING' ? 65 : pipelineState === 'INTENSE' ? 28 : 190;
+
+  if (active && ts - lastSpawn > spawnRate && particles.length < maxP) {
+    particles.push(spawnParticle());
+    lastSpawn = ts;
+  }
+
+  ctx.clearRect(0, 0, 210, 210);
+  const col = STATE_CFG[pipelineState]?.color || '#4F6EF7';
+
+  particles = particles.filter(p => {
+    p.x += p.vx * 0.45; p.y += p.vy * 0.45;
+    p.life -= 0.013;
+    if (pipelineState === 'TRANSLATING') {
+      const dx = p.x - 105, dy = p.y - 105;
+      const dist = Math.sqrt(dx*dx+dy*dy) || 1;
+      p.vx += -dy/dist * 0.005;
+      p.vy += dx/dist * 0.005;
+    }
+    if (pipelineState === 'LISTENING') p.vy -= 0.003;
+    if (p.life <= 0) return false;
+    ctx.globalAlpha = (p.life/p.maxLife) * 0.45;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+    ctx.fill();
+    return true;
+  });
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(particleLoop);
+}
+requestAnimationFrame(particleLoop);
+
+// ============================================================
+// 环形菜单
+// ============================================================
+function toggleRadial() {
+  radialOpen = !radialOpen;
+  radialMenu.classList.toggle('open', radialOpen);
+  if (radialOpen) closeDevicePanel();
+}
+function closeRadial() {
+  radialOpen = false;
+  radialMenu.classList.remove('open');
+}
+radialMenu.querySelectorAll('.radial-item').forEach(item => {
+  item.addEventListener('click', e => {
+    e.stopPropagation();
+    handleAction(item.dataset.action);
+    closeRadial();
+  });
+});
+
+// ============================================================
+// 上下文菜单
+// ============================================================
+function showContextMenu(x, y) {
+  contextMenu.style.left = x + 'px';
+  contextMenu.style.top = y + 'px';
+  contextMenu.classList.add('show');
+}
+function hideContextMenu() { contextMenu.classList.remove('show'); }
+contextMenu.querySelectorAll('.ctx-item').forEach(item => {
+  item.addEventListener('click', () => {
+    handleAction(item.dataset.action);
+    hideContextMenu();
+  });
+});
+
+// ============================================================
+// 动作处理
+// ============================================================
+function handleAction(action) {
+  switch(action) {
+    case 'toggle_capture':
+      isPaused = !isPaused;
+      setPipelineState(isPaused ? 'SLEEP' : 'IDLE');
+      showToast(isPaused ? '⏸ 翻译已暂停' : '▶ 翻译已恢复');
+      break;
+    case 'clear':
+      sourceText.textContent = currentMode === 'loopback' ? '等待英文语音…' : '等待中文语音…';
+      targetText.textContent = '字幕将显示在这里';
+      subtitlePreview.classList.add('empty');
+      showToast('✖ 字幕已清除');
+      break;
+    case 'devices':
+      openDevicePanel();
+      break;
+    case 'mode_switch':
+      setMode(currentMode === 'loopback' ? 'microphone' : 'loopback');
+      break;
+    case 'settings':
+      showToast('⚙ 设置面板已打开');
+      break;
+  }
+}
+
+// ============================================================
+// Toast
+// ============================================================
+let toastTimer;
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
+// ============================================================
+// 鼠标交互
+// ============================================================
+let dragStart = { x:0, y:0 };
+let companionPos = { x:0, y:0 };
+
+companion.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  if (radialOpen || devicePanelOpen) return;
+  dragStart = { x: e.clientX, y: e.clientY };
+  const r = companionArea.getBoundingClientRect();
+  companionPos = { x: r.left, y: r.top };
+  isDragging = true;
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
+  companionArea.style.position = 'fixed';
+  companionArea.style.left = (companionPos.x + dx) + 'px';
+  companionArea.style.top = (companionPos.y + dy) + 'px';
+  const cy = companionPos.y + dy;
+  companionArea.style.opacity = (cy < 50 || cy > window.innerHeight - 50 - 155) ? '0.55' : '1';
+});
+
+document.addEventListener('mouseup', e => {
+  if (!isDragging) return;
+  isDragging = false;
+  companionArea.style.opacity = '1';
+  const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  if (dist < 4) {
+    toggleRadial();
+  } else {
+    const r = companionArea.getBoundingClientRect();
+    if (r.top < 50) showToast('📦 字幕已隐藏（拖至顶部边缘）');
+    else if (r.bottom > window.innerHeight - 50) showToast('📦 字幕已显示（拖至底部边缘）');
+  }
+});
+
+companion.addEventListener('dblclick', e => {
+  e.preventDefault();
+  if (subtitlePreview.style.display === 'none') {
+    subtitlePreview.style.display = '';
+    showToast('字幕显示已开启');
+  } else {
+    subtitlePreview.style.display = 'none';
+    showToast('字幕显示已隐藏');
+  }
+});
+
+companion.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  closeRadial();
+  closeDevicePanel();
+  showContextMenu(e.clientX, e.clientY);
+});
+
+// 点击空白处关闭
+document.addEventListener('click', e => {
+  if (!e.target.closest('.context-menu')) hideContextMenu();
+  if (devicePanelOpen && !e.target.closest('.device-panel') && !e.target.closest('.companion-wrapper')) {
+    closeDevicePanel();
+  }
+  if (radialOpen && !e.target.closest('.radial-menu') && !e.target.closest('.companion')) {
+    closeRadial();
+  }
+});
+
+// ============================================================
+// 模式按钮
+// ============================================================
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => setMode(btn.dataset.mode));
+});
+
+// ============================================================
+// 键盘快捷键
+// ============================================================
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 's') {
+    e.preventDefault();
+    simulateTranslation();
+  }
+  if (e.ctrlKey && e.key === 'v') {
+    e.preventDefault();
+    const phrases = ['hey translator pause','翻译官 暂停','hey translator clear','翻译官 清除字幕'];
+    const phrase = phrases[Math.floor(Math.random()*phrases.length)];
+    showToast('🎤 "' + phrase + '"');
+    wakeBadge.classList.add('active');
+    setTimeout(() => wakeBadge.classList.remove('active'), 2200);
+    if (phrase.includes('pause') || phrase.includes('暂停')) {
+      setTimeout(() => { isPaused = true; setPipelineState('SLEEP'); showToast('⏸ 翻译已暂停'); }, 500);
+    } else if (phrase.includes('clear') || phrase.includes('清除')) {
+      setTimeout(() => handleAction('clear'), 500);
+    }
+  }
+  if (e.ctrlKey && e.key === 'm') {
+    e.preventDefault();
+    setMode(currentMode === 'loopback' ? 'microphone' : 'loopback');
+  }
+  if (e.ctrlKey && e.key === 'd') {
+    e.preventDefault();
+    if (devicePanelOpen) closeDevicePanel(); else openDevicePanel();
+  }
+  if (e.key === 'Escape') {
+    closeRadial();
+    closeDevicePanel();
+  }
+});
+
+// ============================================================
+// 初始化
+// ============================================================
+setPipelineState('IDLE');
+setMode('loopback');
+updateDeviceLabel();
+
+console.log('%c◉ 语音翻译伴侣 %c专业工具风格',
+  'color:#4F6EF7;font-size:14px;','color:#9496A8;');
+console.log('%cCtrl+S:翻译 | Ctrl+V:语音指令 | Ctrl+M:切换模式 | Ctrl+D:设备面板 | Esc:关闭',
+  'color:#5A5C72;');
+</script>
+</body>
+</html>

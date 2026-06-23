@@ -1,0 +1,96 @@
+{
+    "_comment": "Voice Translation Config — optimized for low latency + high accuracy",
+    "audio": {
+        "capture_mode": "loopback",
+        "sample_rate": 48000,
+        "channels": 2,
+        "chunk_ms": 60,
+        "target_sample_rate": 16000,
+        "target_channels": 1,
+        "device_id": null,
+        "_device_id_help": "Unified device ID: 'wasapi:N' for native loopback, 'sounddevice:N' for sounddevice. null = auto-detect default."
+    },
+    "asr": {
+        "model_size": "base.en",
+        "device": "cuda",
+        "compute_type": "float16",
+        "beam_size": 5,
+        "best_of": 3,
+        "language": "en",
+        "vad_filter": true,
+        "vad_min_silence_ms": 500,
+        "vad_speech_pad_ms": 400,
+        "no_speech_threshold": 0.5,
+        "condition_on_previous_text": false,
+        "repetition_penalty": 1.0,
+        "preprocess": true,
+        "_asr_help": "beam_size=5, best_of=3 for speed. no_speech_threshold=0.6 filters noise. condition_on_previous_text=false prevents hallucinations."
+    },
+    "translation": {
+        "engine": "auto",
+        "source_lang": "EN",
+        "target_lang": "ZH",
+        "timeout_sec": 8.0,
+        "max_retries": 2,
+        "game_context": ""
+    },
+    "ui": {
+        "max_lines": 5,
+        "font_size": 28,
+        "font_color": "#FFFFFF",
+        "outline_color": "#000000",
+        "outline_width": 2,
+        "background_opacity": 0.0,
+        "fade_sec": 8.0,
+        "width": 1200,
+        "height": 200,
+        "position": "bottom_center",
+        "neon_glow": true
+    },
+    "companion": {
+        "enabled": true,
+        "_enabled_help": "Enable AI Desktop Companion as primary UI",
+        "mode": "replace",
+        "_mode_help": "'replace' = companion replaces ControlPanel. 'coexist' = both shown. 'off' = ControlPanel only.",
+        "size": 100,
+        "_size_help": "Companion diameter in pixels (60-200)",
+        "initial_position": "center",
+        "_position_help": "center_right, top_right, bottom_right, center, or custom",
+        "custom_x": null,
+        "custom_y": null,
+        "glass_background": true,
+        "auto_sleep_sec": 120,
+        "_auto_sleep_help": "Seconds of IDLE before auto-transitioning to SLEEP. 0 = never.",
+        "edge_snap": {
+            "enabled": true,
+            "snap_threshold_px": 50,
+            "top_action": "hide_subtitles",
+            "bottom_action": "show_subtitles"
+        },
+        "particles": {
+            "enabled": true,
+            "max_count": 25,
+            "spawn_rate_ms": 60
+        },
+        "voice_commands": {
+            "enabled": true,
+            "wake_words": ["hey translator", "hey 翻译", "翻译官"],
+            "wake_timeout_ms": 5000,
+            "commands": {
+                "pause": ["pause", "stop", "暂停", "停止"],
+                "resume": ["resume", "start", "继续", "开始"],
+                "clear": ["clear", "清除", "清空"],
+                "show_overlay": ["show", "显示", "打开字幕"],
+                "hide_overlay": ["hide", "隐藏", "关闭字幕"],
+                "settings": ["settings", "设置", "配置"]
+            }
+        }
+    },
+    "hotkeys": {
+        "toggle_capture": "ctrl+shift+t",
+        "clear_subtitles": "ctrl+shift+c",
+        "toggle_ui_visible": "ctrl+shift+h",
+        "increase_font": "ctrl+shift+=",
+        "decrease_font": "ctrl+shift+-"
+    }
+}

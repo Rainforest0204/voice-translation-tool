@@ -1,0 +1,23 @@
+# Game Voice Translation Tool — MVP Dependencies
+# Audio Capture
+sounddevice>=0.5
+
+# ASR (GPU-accelerated Whisper)
+faster-whisper>=1.0
+nvidia-cublas-cu12>=12.0  # CUDA BLAS for GPU acceleration
+
+# Audio processing
+numpy>=1.26
+scipy>=1.14
+
+# Cloud Translation API
+httpx>=0.27
+
+# Subtitle UI
+PyQt6>=6.7
+
+# Windows API helpers
+pywin32>=306
+
+# Environment config (.env)
+python-dotenv>=1.0
